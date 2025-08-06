@@ -33,7 +33,7 @@ UR5e_INSPIRE_CFG = ArticulationCfg(
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
             enabled_self_collisions=True,
-            solver_postion_iteration_count=8,
+            solver_position_iteration_count=8,
             solver_velocity_iteration_count=0,
         ),
     ),
