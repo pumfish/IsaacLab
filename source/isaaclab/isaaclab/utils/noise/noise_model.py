@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -130,7 +130,7 @@ class NoiseModel:
         """
         pass
 
-    def __call__(self, data: torch.Tensor) -> torch.Tensor:
+    def apply(self, data: torch.Tensor) -> torch.Tensor:
         """Apply the noise to the data.
 
         Args:
@@ -154,8 +154,6 @@ class NoiseModelWithAdditiveBias(NoiseModel):
         # store the bias noise configuration
         self._bias_noise_cfg = noise_model_cfg.bias_noise_cfg
         self._bias = torch.zeros((num_envs, 1), device=self._device)
-        self._num_components: int | None = None
-        self._sample_bias_per_component = noise_model_cfg.sample_bias_per_component
 
     def reset(self, env_ids: Sequence[int] | None = None):
         """Reset the noise model.
@@ -172,7 +170,7 @@ class NoiseModelWithAdditiveBias(NoiseModel):
         # reset the bias term
         self._bias[env_ids] = self._bias_noise_cfg.func(self._bias[env_ids], self._bias_noise_cfg)
 
-    def __call__(self, data: torch.Tensor) -> torch.Tensor:
+    def apply(self, data: torch.Tensor) -> torch.Tensor:
         """Apply bias noise to the data.
 
         Args:
@@ -181,11 +179,4 @@ class NoiseModelWithAdditiveBias(NoiseModel):
         Returns:
             The data with the noise applied. Shape is the same as the input data.
         """
-        # if sample_bias_per_component, on first apply, expand bias to match last dim of data
-        if self._sample_bias_per_component and self._num_components is None:
-            *_, self._num_components = data.shape
-            # expand bias from (num_envs,1) to (num_envs, num_components)
-            self._bias = self._bias.repeat(1, self._num_components)
-            # now re-sample that expanded bias in-place
-            self.reset()
-        return super().__call__(data) + self._bias
+        return super().apply(data) + self._bias

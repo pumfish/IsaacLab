@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -19,6 +19,7 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers.manager_base import ManagerTermBase
 from isaaclab.managers.manager_term_cfg import RewardTermCfg
 from isaaclab.sensors import ContactSensor, RayCaster
+import pdb
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
@@ -149,6 +150,12 @@ def joint_vel_l1(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Ten
     asset: Articulation = env.scene[asset_cfg.name]
     return torch.sum(torch.abs(asset.data.joint_vel[:, asset_cfg.joint_ids]), dim=1)
 
+def joint_vel_l1_name(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, action_name: str) -> torch.Tensor:
+    """Penalize the rate of change of the actions using L1 kernel."""
+    asset: Articulation = env.scene[asset_cfg.name]
+    begin = env.action_manager._terms[action_name]._joint_ids[0]
+    end = env.action_manager._terms[action_name]._joint_ids[-1]
+    return torch.sum(torch.abs(asset.data.joint_vel[:, begin:end]), dim=1)
 
 def joint_vel_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Penalize joint velocities on the articulation using L2 squared kernel.
@@ -246,10 +253,23 @@ def action_rate_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the rate of change of the actions using L2 squared kernel."""
     return torch.sum(torch.square(env.action_manager.action - env.action_manager.prev_action), dim=1)
 
-
 def action_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the actions using L2 squared kernel."""
     return torch.sum(torch.square(env.action_manager.action), dim=1)
+
+def action_l1_name(env: ManagerBasedRLEnv, action_name: str) -> torch.Tensor:
+    """Penalize the rate of change of the actions using L2 squared kernel."""
+    begin = env.action_manager._terms[action_name]._joint_ids[0]
+    end = env.action_manager._terms[action_name]._joint_ids[-1]
+
+    return torch.sum(torch.abs(env.action_manager.action[...,begin:end]), dim=1)
+
+def action_rate_l2_name(env: ManagerBasedRLEnv, action_name: str) -> torch.Tensor:
+    """Penalize the rate of change of the actions using L2 squared kernel."""
+    begin = env.action_manager._terms['action_name']._joint_ids[0]
+    end = env.action_manager._terms['action_name']._joint_ids[-1]
+
+    return torch.sum(torch.square(env.action_manager.action[...,begin:end] - env.action_manager.prev_action[...,begin:end]), dim=1)
 
 
 """
@@ -266,16 +286,6 @@ def undesired_contacts(env: ManagerBasedRLEnv, threshold: float, sensor_cfg: Sce
     is_contact = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0] > threshold
     # sum over contacts for each environment
     return torch.sum(is_contact, dim=1)
-
-
-def desired_contacts(env, sensor_cfg: SceneEntityCfg, threshold: float = 1.0) -> torch.Tensor:
-    """Penalize if none of the desired contacts are present."""
-    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
-    contacts = (
-        contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :].norm(dim=-1).max(dim=1)[0] > threshold
-    )
-    zero_contact = (~contacts).all(dim=1)
-    return 1.0 * zero_contact
 
 
 def contact_forces(env: ManagerBasedRLEnv, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:

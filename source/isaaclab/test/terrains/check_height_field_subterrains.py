@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -17,7 +17,8 @@ from isaaclab.app import AppLauncher
 
 # launch omniverse app
 # note: we only need to do this because of `TerrainImporter` which uses Omniverse functions
-simulation_app = AppLauncher(headless=True).app
+app_launcher = AppLauncher(headless=True)
+simulation_app = app_launcher.app
 
 """Rest everything follows."""
 

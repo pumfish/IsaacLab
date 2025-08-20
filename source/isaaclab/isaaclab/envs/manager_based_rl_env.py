@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -74,9 +74,7 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         """
         # -- counter for curriculum
         self.common_step_counter = 0
-
-        # initialize the episode length buffer BEFORE loading the managers to use it in mdp functions.
-        self.episode_length_buf = torch.zeros(cfg.scene.num_envs, device=cfg.sim.device, dtype=torch.long)
+        self.last_curriculum_update = 0
 
         # initialize the base class to setup the scene.
         super().__init__(cfg=cfg)
@@ -84,6 +82,8 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         self.render_mode = render_mode
 
         # initialize data and constants
+        # -- init buffers
+        self.episode_length_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
         # -- set the framerate of the gym video recorder wrapper so that the playback speed of the produced video matches the simulation
         self.metadata["render_fps"] = 1 / self.step_dt
 
@@ -237,7 +237,7 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
             self.event_manager.apply(mode="interval", dt=self.step_dt)
         # -- compute observations
         # note: done after reset to get the correct observations for reset envs
-        self.obs_buf = self.observation_manager.compute(update_history=True)
+        self.obs_buf = self.observation_manager.compute()
 
         # return observations, rewards, resets and extras
         return self.obs_buf, self.reward_buf, self.reset_terminated, self.reset_time_outs, self.extras
@@ -248,7 +248,7 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         By convention, if mode is:
 
         - **human**: Render to the current display and return nothing. Usually for human consumption.
-        - **rgb_array**: Return a numpy.ndarray with shape (x, y, 3), representing RGB values for an
+        - **rgb_array**: Return an numpy.ndarray with shape (x, y, 3), representing RGB values for an
           x-by-y pixel image, suitable for turning into a video.
 
         Args:
@@ -333,13 +333,10 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
             if has_concatenated_obs:
                 self.single_observation_space[group_name] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=group_dim)
             else:
-                group_term_cfgs = self.observation_manager._group_obs_term_cfgs[group_name]
-                for term_name, term_dim, term_cfg in zip(group_term_names, group_dim, group_term_cfgs):
-                    low = -np.inf if term_cfg.clip is None else term_cfg.clip[0]
-                    high = np.inf if term_cfg.clip is None else term_cfg.clip[1]
-                    self.single_observation_space[group_name] = gym.spaces.Dict(
-                        {term_name: gym.spaces.Box(low=low, high=high, shape=term_dim)}
-                    )
+                self.single_observation_space[group_name] = gym.spaces.Dict({
+                    term_name: gym.spaces.Box(low=-np.inf, high=np.inf, shape=term_dim)
+                    for term_name, term_dim in zip(group_term_names, group_dim)
+                })
         # action space (unbounded since we don't impose any limits)
         action_dim = sum(self.action_manager.action_term_dim)
         self.single_action_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(action_dim,))
@@ -394,3 +391,17 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
 
         # reset the episode length buffer
         self.episode_length_buf[env_ids] = 0
+
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    # 添加一个meta-reset函数，区别于一般的reset函数，用eventterm调用
+    # 作为MetaRL算法参数随机化的时机
+    from .common import VecEnvObs
+    def meta_reset(
+        self, seed: int | None = None, env_ids: Sequence[int] | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[VecEnvObs, dict]:
+        obs_buf, extras = self.reset(seed, env_ids, options)
+        # 调用事件管理器，触发mode为"meta_reset"的所有事件term
+        self.event_manager.apply(mode="meta_reset", env_ids=env_ids)
+        # return observations
+        return obs_buf, extras
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

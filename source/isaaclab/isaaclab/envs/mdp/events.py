@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -30,6 +30,7 @@ from isaaclab.actuators import ImplicitActuator
 from isaaclab.assets import Articulation, DeformableObject, RigidObject
 from isaaclab.managers import EventTermCfg, ManagerTermBase, SceneEntityCfg
 from isaaclab.terrains import TerrainImporter
+import pdb
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
@@ -349,47 +350,6 @@ def randomize_rigid_body_mass(
             inertias[env_ids] = asset.data.default_inertia[env_ids] * ratios
         # set the inertia tensors into the physics simulation
         asset.root_physx_view.set_inertias(inertias, env_ids)
-
-
-def randomize_rigid_body_com(
-    env: ManagerBasedEnv,
-    env_ids: torch.Tensor | None,
-    com_range: dict[str, tuple[float, float]],
-    asset_cfg: SceneEntityCfg,
-):
-    """Randomize the center of mass (CoM) of rigid bodies by adding a random value sampled from the given ranges.
-
-    .. note::
-        This function uses CPU tensors to assign the CoM. It is recommended to use this function
-        only during the initialization of the environment.
-    """
-    # extract the used quantities (to enable type-hinting)
-    asset: Articulation = env.scene[asset_cfg.name]
-    # resolve environment ids
-    if env_ids is None:
-        env_ids = torch.arange(env.scene.num_envs, device="cpu")
-    else:
-        env_ids = env_ids.cpu()
-
-    # resolve body indices
-    if asset_cfg.body_ids == slice(None):
-        body_ids = torch.arange(asset.num_bodies, dtype=torch.int, device="cpu")
-    else:
-        body_ids = torch.tensor(asset_cfg.body_ids, dtype=torch.int, device="cpu")
-
-    # sample random CoM values
-    range_list = [com_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z"]]
-    ranges = torch.tensor(range_list, device="cpu")
-    rand_samples = math_utils.sample_uniform(ranges[:, 0], ranges[:, 1], (len(env_ids), 3), device="cpu").unsqueeze(1)
-
-    # get the current com of the bodies (num_assets, num_bodies)
-    coms = asset.root_physx_view.get_coms().clone()
-
-    # Randomize the com in range
-    coms[:, body_ids, :3] += rand_samples
-
-    # Set the new coms
-    asset.root_physx_view.set_coms(coms, env_ids)
 
 
 def randomize_rigid_body_collider_offsets(
@@ -885,7 +845,6 @@ def reset_root_state_uniform(
     asset: RigidObject | Articulation = env.scene[asset_cfg.name]
     # get default root state
     root_states = asset.data.default_root_state[env_ids].clone()
-
     # poses
     range_list = [pose_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
     ranges = torch.tensor(range_list, device=asset.device)
@@ -1040,27 +999,22 @@ def reset_joints_by_scale(
     # extract the used quantities (to enable type-hinting)
     asset: Articulation = env.scene[asset_cfg.name]
     # get default joint state
-    joint_pos = asset.data.default_joint_pos[env_ids, asset_cfg.joint_ids].clone()
-    joint_vel = asset.data.default_joint_vel[env_ids, asset_cfg.joint_ids].clone()
+    joint_pos = asset.data.default_joint_pos[env_ids].clone()
+    joint_vel = asset.data.default_joint_vel[env_ids].clone()
 
     # scale these values randomly
     joint_pos *= math_utils.sample_uniform(*position_range, joint_pos.shape, joint_pos.device)
     joint_vel *= math_utils.sample_uniform(*velocity_range, joint_vel.shape, joint_vel.device)
 
     # clamp joint pos to limits
-    joint_pos_limits = asset.data.soft_joint_pos_limits[env_ids, asset_cfg.joint_ids]
+    joint_pos_limits = asset.data.soft_joint_pos_limits[env_ids]
     joint_pos = joint_pos.clamp_(joint_pos_limits[..., 0], joint_pos_limits[..., 1])
     # clamp joint vel to limits
-    joint_vel_limits = asset.data.soft_joint_vel_limits[env_ids, asset_cfg.joint_ids]
+    joint_vel_limits = asset.data.soft_joint_vel_limits[env_ids]
     joint_vel = joint_vel.clamp_(-joint_vel_limits, joint_vel_limits)
 
     # set into the physics simulation
-    asset.write_joint_state_to_sim(
-        joint_pos.view(len(env_ids), -1),
-        joint_vel.view(len(env_ids), -1),
-        env_ids=env_ids,
-        joint_ids=asset_cfg.joint_ids,
-    )
+    asset.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
 
 
 def reset_joints_by_offset(
@@ -1079,27 +1033,22 @@ def reset_joints_by_offset(
     asset: Articulation = env.scene[asset_cfg.name]
 
     # get default joint state
-    joint_pos = asset.data.default_joint_pos[env_ids, asset_cfg.joint_ids].clone()
-    joint_vel = asset.data.default_joint_vel[env_ids, asset_cfg.joint_ids].clone()
+    joint_pos = asset.data.default_joint_pos[env_ids].clone()
+    joint_vel = asset.data.default_joint_vel[env_ids].clone()
 
     # bias these values randomly
     joint_pos += math_utils.sample_uniform(*position_range, joint_pos.shape, joint_pos.device)
     joint_vel += math_utils.sample_uniform(*velocity_range, joint_vel.shape, joint_vel.device)
 
     # clamp joint pos to limits
-    joint_pos_limits = asset.data.soft_joint_pos_limits[env_ids, asset_cfg.joint_ids]
+    joint_pos_limits = asset.data.soft_joint_pos_limits[env_ids]
     joint_pos = joint_pos.clamp_(joint_pos_limits[..., 0], joint_pos_limits[..., 1])
     # clamp joint vel to limits
-    joint_vel_limits = asset.data.soft_joint_vel_limits[env_ids, asset_cfg.joint_ids]
+    joint_vel_limits = asset.data.soft_joint_vel_limits[env_ids]
     joint_vel = joint_vel.clamp_(-joint_vel_limits, joint_vel_limits)
 
     # set into the physics simulation
-    asset.write_joint_state_to_sim(
-        joint_pos.view(len(env_ids), -1),
-        joint_vel.view(len(env_ids), -1),
-        env_ids=env_ids,
-        joint_ids=asset_cfg.joint_ids,
-    )
+    asset.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
 
 
 def reset_nodal_state_uniform(
@@ -1144,14 +1093,8 @@ def reset_nodal_state_uniform(
     asset.write_nodal_state_to_sim(nodal_state, env_ids=env_ids)
 
 
-def reset_scene_to_default(env: ManagerBasedEnv, env_ids: torch.Tensor, reset_joint_targets: bool = False):
-    """Reset the scene to the default state specified in the scene configuration.
-
-    If :attr:`reset_joint_targets` is True, the joint position and velocity targets of the articulations are
-    also reset to their default values. This might be useful for some cases to clear out any previously set targets.
-    However, this is not the default behavior as based on our experience, it is not always desired to reset
-    targets to default values, especially when the targets should be handled by action terms and not event terms.
-    """
+def reset_scene_to_default(env: ManagerBasedEnv, env_ids: torch.Tensor):
+    """Reset the scene to the default state specified in the scene configuration."""
     # rigid bodies
     for rigid_object in env.scene.rigid_objects.values():
         # obtain default and deal with the offset for env origins
@@ -1173,10 +1116,6 @@ def reset_scene_to_default(env: ManagerBasedEnv, env_ids: torch.Tensor, reset_jo
         default_joint_vel = articulation_asset.data.default_joint_vel[env_ids].clone()
         # set into the physics simulation
         articulation_asset.write_joint_state_to_sim(default_joint_pos, default_joint_vel, env_ids=env_ids)
-        # reset joint targets if required
-        if reset_joint_targets:
-            articulation_asset.set_joint_position_target(default_joint_pos, env_ids=env_ids)
-            articulation_asset.set_joint_velocity_target(default_joint_vel, env_ids=env_ids)
     # deformable objects
     for deformable_object in env.scene.deformable_objects.values():
         # obtain default and set into the physics simulation
@@ -1249,25 +1188,8 @@ class randomize_visual_texture_material(ManagerTermBase):
             body_names_regex = ".*"
 
         # create the affected prim path
-        # Check if the pattern with '/visuals' yields results when matching `body_names_regex`.
-        # If not, fall back to a broader pattern without '/visuals'.
-        asset_main_prim_path = asset.cfg.prim_path
-        # Try the pattern with '/visuals' first for the generic case
-        pattern_with_visuals = f"{asset_main_prim_path}/{body_names_regex}/visuals"
-        # Use sim_utils to check if any prims currently match this pattern
-        matching_prims = sim_utils.find_matching_prim_paths(pattern_with_visuals)
-        if matching_prims:
-            # If matches are found, use the pattern with /visuals
-            prim_path = pattern_with_visuals
-        else:
-            # If no matches found, fall back to the broader pattern without /visuals
-            # This pattern (e.g., /World/envs/env_.*/Table/.*) should match visual prims
-            # whether they end in /visuals or have other structures.
-            prim_path = f"{asset_main_prim_path}/.*"
-            carb.log_info(
-                f"Pattern '{pattern_with_visuals}' found no prims. Falling back to '{prim_path}' for texture"
-                " randomization."
-            )
+        # TODO: Remove the hard-coded "/visuals" part.
+        prim_path = f"{asset.cfg.prim_path}/{body_names_regex}/visuals"
 
         # Create the omni-graph node for the randomization term
         def rep_texture_randomization():
@@ -1277,6 +1199,7 @@ class randomize_visual_texture_material(ManagerTermBase):
                 rep.randomizer.texture(
                     textures=texture_paths, project_uvw=True, texture_rotate=rep.distribution.uniform(*texture_rotation)
                 )
+
             return prims_group.node
 
         # Register the event to the replicator

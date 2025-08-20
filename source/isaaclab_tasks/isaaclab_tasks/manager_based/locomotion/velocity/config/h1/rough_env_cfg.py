@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -95,7 +95,9 @@ class H1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
                 "yaw": (0.0, 0.0),
             },
         }
-        self.events.base_com = None
+
+        # Terminations
+        self.terminations.base_contact.params["sensor_cfg"].body_names = [".*torso_link"]
 
         # Rewards
         self.rewards.undesired_contacts = None
@@ -109,7 +111,7 @@ class H1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
 
-        # Terminations
+        # terminations
         self.terminations.base_contact.params["sensor_cfg"].body_names = ".*torso_link"
 
 

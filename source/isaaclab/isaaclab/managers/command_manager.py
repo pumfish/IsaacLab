@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -14,7 +14,7 @@ from abc import abstractmethod
 from collections.abc import Sequence
 from prettytable import PrettyTable
 from typing import TYPE_CHECKING
-
+import pdb
 import omni.kit.app
 
 from .manager_base import ManagerBase, ManagerTermBase
@@ -58,6 +58,8 @@ class CommandTerm(ManagerTermBase):
         self._debug_vis_handle = None
         # set initial state of debug visualization
         self.set_debug_vis(self.cfg.debug_vis)
+        
+        self.last_metric = None
 
     def __del__(self):
         """Unsubscribe from the callbacks."""
@@ -136,10 +138,16 @@ class CommandTerm(ManagerTermBase):
         # add logging metrics
         extras = {}
         for metric_name, metric_value in self.metrics.items():
-            # compute the mean metric value
-            extras[metric_name] = torch.mean(metric_value[env_ids]).item()
-            # reset the metric value
-            metric_value[env_ids] = 0.0
+            if isinstance(metric_value, torch.Tensor):
+                # compute the mean metric value
+                extras[metric_name] = torch.mean(metric_value[env_ids].float()).item()
+                # reset the metric value
+                metric_value[env_ids] = 0.0
+            elif isinstance(metric_value, float):
+                # directly log the float value
+                extras[metric_name] = metric_value           
+        
+        self.last_metric = extras
 
         # set the command counter to zero
         self.command_counter[env_ids] = 0
@@ -181,10 +189,10 @@ class CommandTerm(ManagerTermBase):
         if len(env_ids) != 0:
             # resample the time left before resampling
             self.time_left[env_ids] = self.time_left[env_ids].uniform_(*self.cfg.resampling_time_range)
-            # resample the command
-            self._resample_command(env_ids)
             # increment the command counter
             self.command_counter[env_ids] += 1
+            # resample the command
+            self._resample_command(env_ids)
 
     """
     Implementation specific functions.

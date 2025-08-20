@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -11,7 +11,7 @@ import inspect
 import re
 from collections.abc import Callable, Sequence
 from typing import Any
-
+import pdb
 """
 String formatting.
 """
@@ -257,6 +257,8 @@ def resolve_matching_names(
         index_list = index_list_reorder
         names_list = names_list_reorder
     # check that all regular expressions are matched
+    print(len(list_of_strings),list_of_strings)
+    # pdb.set_trace()
     if not all(keys_match_found):
         # make this print nicely aligned for debugging
         msg = "\n"
