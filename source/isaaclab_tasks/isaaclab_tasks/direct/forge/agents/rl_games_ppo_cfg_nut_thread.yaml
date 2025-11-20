@@ -50,7 +50,7 @@ params:
   load_path: ""
 
   config:
-    name: Factory
+    name: Forge
     device: cuda:0
     full_experiment_name: test
     env_name: rlgpu
@@ -76,10 +76,10 @@ params:
     save_frequency: 100
     print_stats: True
     grad_norm: 1.0
-    entropy_coef: 0.0  # 0.0001  # 0.0
+    entropy_coef: 0.0
     truncate_grads: True
     e_clip: 0.2
-    horizon_length: 128
+    horizon_length: 256
     minibatch_size: 512  # batch size = num_envs * horizon_length; minibatch_size = batch_size / num_minibatches
     mini_epochs: 4
     critic_coef: 2

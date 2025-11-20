@@ -12,31 +12,31 @@ from . import agents
 ##
 
 gym.register(
-    id="Isaac-Factory-PegInsert-Direct-v0",
-    entry_point=f"{__name__}.factory_env:FactoryEnv",
+    id="Isaac-Forge-PegInsert-Direct-v0",
+    entry_point=f"{__name__}.forge_env:ForgeEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.factory_env_cfg:FactoryTaskPegInsertCfg",
+        "env_cfg_entry_point": f"{__name__}.forge_env_cfg:ForgeTaskPegInsertCfg",
         "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_cfg.yaml",
     },
 )
 
 gym.register(
-    id="Isaac-Factory-GearMesh-Direct-v0",
-    entry_point=f"{__name__}.factory_env:FactoryEnv",
+    id="Isaac-Forge-GearMesh-Direct-v0",
+    entry_point=f"{__name__}.forge_env:ForgeEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.factory_env_cfg:FactoryTaskGearMeshCfg",
+        "env_cfg_entry_point": f"{__name__}.forge_env_cfg:ForgeTaskGearMeshCfg",
         "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_cfg.yaml",
     },
 )
 
 gym.register(
-    id="Isaac-Factory-NutThread-Direct-v0",
-    entry_point=f"{__name__}.factory_env:FactoryEnv",
+    id="Isaac-Forge-NutThread-Direct-v0",
+    entry_point=f"{__name__}.forge_env:ForgeEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.factory_env_cfg:FactoryTaskNutThreadCfg",
-        "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_cfg.yaml",
+        "env_cfg_entry_point": f"{__name__}.forge_env_cfg:ForgeTaskNutThreadCfg",
+        "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_cfg_nut_thread.yaml",
     },
 )
